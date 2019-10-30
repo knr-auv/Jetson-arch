@@ -10,7 +10,7 @@ class Camera:
     objCenters = []
 
     # # list contain lists of zones of currently detected objects
-    # objZones = []
+    # objZones =  []
 
     # list of deltas (dx, dy) defining objects displacament from the frame's center
     objCenterDeltas = []
