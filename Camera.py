@@ -1,8 +1,6 @@
-import os
 import cv2
 import numpy as np
-import time
-import darknet
+from Detector import Detector
 
 
 class Camera:
@@ -14,9 +12,9 @@ class Camera:
 
     # list of deltas (dx, dy) defining objects displacament from the frame's center
     objCenterDeltas = []
-    
+
     # path angle delta
-    pathAngle=0
+    pathAngle = 0
 
     # list of distance of currently detected objects
     objDistances = []
@@ -31,218 +29,167 @@ class Camera:
     objectsFillLevel = 0
 
     # frame dimensions (firstly assumed but updated to real ones when capturing the frame)
-    frameHeight = 1080
-    frameWidth = 1920
+    frameHeight = 720
+    frameWidth = 1280
 
-    def openCamera(self):
-        
-        metaMain = None
-        netMain = None
-        altNames = None
-        
-        configPath = "cfg/yolov3-tiny-obj.cfg"
-        weightPath = "backup/yolov3-tiny-obj_2000.weights"
-        metaPath = "data/r2d2.data"
-        
-        if netMain is None:
-            netMain = darknet.load_net_custom(configPath.encode("ascii"), weightPath.encode("ascii"), 0, 1)  # batch size = 1
-        if metaMain is None:
-            metaMain = darknet.load_meta(metaPath.encode("ascii"))
-        if altNames is None:
-            try:
-                with open(metaPath) as metaFH:
-                    metaContents = metaFH.read()
-                    import re
-                    match = re.search("names *= *(.*)$", metaContents,
-                                      re.IGNORECASE | re.MULTILINE)
-                    if match:
-                        result = match.group(1)
-                    else:
-                        result = None
-                    try:
-                        if os.path.exists(result):
-                            with open(result) as namesFH:
-                                namesList = namesFH.read().strip().split("\n")
-                                altNames = [x.strip() for x in namesList]
-                    except TypeError:
-                        pass
-            except Exception:
-                pass
+    captures = []
 
-        capture1 = cv2.VideoCapture(1)
-        capture1.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        capture1.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        capture1.set(cv2.CAP_PROP_FPS, 30);
-        
-        capture2 = cv2.VideoCapture(2)
-        capture2.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        capture2.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        capture2.set(cv2.CAP_PROP_FPS, 30);
-        
-        darknet_image = darknet.make_image(darknet.network_width(netMain), darknet.network_height(netMain), 3)
-        self.cameraFlag=False
+    def __init__(self):
+        self.detector = Detector()
 
-        while True:
-            stime = time.time()
+        # capture for both cameras
+        capture_front = cv2.VideoCapture(1)
+        capture_front.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        capture_front.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        capture_front.set(cv2.CAP_PROP_FPS, 30)
 
-            if(self.cameraFlag==False):
-                ret, frame = capture1.read()
-                #frame = frame[8:712,0:1280]
+        capture_down = cv2.VideoCapture(2)
+        capture_down.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        capture_down.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        capture_down.set(cv2.CAP_PROP_FPS, 30);
+
+        self.captures = [capture_front, capture_down]
+
+        # selection which camera view to process - [front, down]
+        self.view_selection = [True, True]
+
+    def __del__(self):
+        for capture in self.captures:
+            capture.release()
+
+    def process(self):
+        detections = [[]] * 2
+        frames = [np.array([])] * 2
+
+        # populate detections from both cameras
+        for i in range(2):
+            if self.view_selection[i]:
+                ret, frame = self.captures[i].read()
                 if ret:
-                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                     frame_resized = cv2.resize(frame_rgb,
-                          (darknet.network_width(netMain),
-                           darknet.network_height(netMain)),
-                          interpolation=cv2.INTER_LINEAR)
-                     self.detections.clear()
-                     self.updateFrameDimensions(frame_resized)
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    frame_resized = cv2.resize(frame_rgb, self.detector.get_network_size(),
+                                               interpolation=cv2.INTER_LINEAR)
+                    detections[i] = self.detector.detect(frame_resized)
+                    frames[i] = self.draw_boxes(detections[i], frame_resized)
+                    frames[i] = cv2.cvtColor(frames[i], cv2.COLOR_BGR2RGB)
 
-                     darknet.copy_image_from_bytes(darknet_image, frame_resized.tobytes())
-                
-                     self.detections = darknet.detect_image(netMain, metaMain, darknet_image, thresh=0.25)
+        self.detections = detections
 
-                     frame, xmin, ymin, xmax, ymax = self.cvDrawBoxes(self.detections, frame_resized)
-                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        return frames
 
-                     self.saveObjectsCenters(self.detections)
-                     self.objectsFillLevel = self.getObjectsFillLevel(self.detections)
-
-                     self.saveObjectsCenterDeltas()
-                     self.objectsFillLevel = round(self.objectsFillLevel, 2)
-                     
-                
-		# self.saveObjectsZones(detections)
-                # print(self.getObjectsZones())
-
-                 #    self.getMonoDistance(self.detections)
-                     self.cameraFlag=True
-                     cv2.imshow('frameMono', frame)
-            else:
-                ret, frame = capture2.read()
-                frame = frame[8:712,0:1280]
-                if ret:
-                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                     frame_resized = cv2.resize(frame_rgb,
-                          (darknet.network_width(netMain),
-                           darknet.network_height(netMain)),
-                          interpolation=cv2.INTER_LINEAR)
-
-                     self.updateFrameDimensions(frame_resized)
-
-                     darknet.copy_image_from_bytes(darknet_image, frame_resized.tobytes())
-                
-                     self.detections = darknet.detect_image(netMain, metaMain, darknet_image, thresh=0.25)
-
-                     frame, xmin, ymin, xmax, ymax = self.cvDrawBoxes(self.detections, frame_resized)
-                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-                     self.saveObjectsCenters(self.detections)
-                     self.objectsFillLevel = self.getObjectsFillLevel(self.detections)
-
-                     self.saveObjectsCenterDeltas()
-               
-                
-		# self.saveObjectsZones(detections)
-                # print(self.getObjectsZones())
-
-                     #self.getMonoDistance(self.detections)
-                     self.cameraFlag=False
-                     cv2.imshow('frameStereo', frame)
-
-            # print('FPS {:.1f}\n'.format(1 / (time.time() - stime)))
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-
-        capture.release()
-        cv2.destroyAllWindows()
-
-    def updateFrameDimensions(self, frame):
+    def update_frame_dimensions(self, frame):
         self.frameHeight = np.size(frame, 0)
         self.frameWidth = np.size(frame, 1)
 
-    def getFrameCenter(self):
+    def get_frame_center(self):
         xc = int(self.frameWidth / 2)
         yc = int(self.frameHeight / 2)
         return xc, yc
 
-    def getObjectCenter(self, detection):
+    def get_object_center(self, detection):
         x, y = detection[2][0], detection[2][1]
         return x, y
 
-    def getObjectDimensions(self, detection):
+    def get_object_size(self, detection):
         width, height = detection[2][2], detection[2][3]
         return width, height
 
-    def getObjectsNum(self, detections):
-        return len(detections)
+    def get_objects_number(self, camera_detections):
+        return len(camera_detections)
 
-    def saveObjectsCenters(self, detections):
-        objNum = self.getObjectsNum(detections)
-        for detection in detections:
-            # if place in list 'objCenters' was previously populated
-            if detections.index(detection) < len(self.objCenters):
-                # swap values in this place in list
-                self.objCenters[detections.index(detection)] = self.getObjectCenter(detection)
-            else:
-                self.objCenters.append(self.getObjectCenter(detection))
+    def get_objects_centers(self, camera_detections):
+        objects_centers = []
+        for detection in camera_detections:
+            objects_centers.append(self.get_object_center(detection))
+        return objects_centers
 
-        # pop all surplus elements
-        for i in range(objNum, len(self.objCenters)):
-            self.objCenters.pop(objNum)
+    # def saveObjectsCenters(self, detections):
+    #     objNum = self.get_objects_number(detections)
+    #     for detection in detections:
+    #         # if place in list 'objCenters' was previously populated
+    #         if detections.index(detection) < len(self.objCenters):
+    #             # swap values in this place in list
+    #             self.objCenters[detections.index(detection)] = self.get_object_center(detection)
+    #         else:
+    #             self.objCenters.append(self.get_object_center(detection))
+    #
+    #     # pop all surplus elements
+    #     for i in range(objNum, len(self.objCenters)):
+    #         self.objCenters.pop(objNum)
 
-    def getObjectsVertexes(self, detections):
-        objVertexes = []
-        for detection in detections:
-            x, y = self.getObjectCenter(detection)
-            w, h = self.getObjectDimensions(detection)
-            xmin, ymin, xmax, ymax = self.convertBack(
-                float(x), float(y), float(w), float(h))
-            tl = [xmin, ymin]
-            tr = [xmax, ymin]
-            br = [xmax, ymax]
-            bl = [xmin, ymax]
-            rect = [tl, tr, br, bl]
-            objVertexes.append(rect)
-        return objVertexes
+    def get_object_vertexes(self, detection):
+        x, y = self.get_object_center(detection)
+        w, h = self.get_object_size(detection)
+        x_min, y_min, x_max, y_max = self.convert_centered_to_topleft(float(x), float(y), float(w), float(h))
+        tl = [x_min, y_min]
+        tr = [x_max, y_min]
+        br = [x_max, y_max]
+        bl = [x_min, y_max]
+        rect = [tl, tr, br, bl]
 
-    def getObjectsFillLevel(self, detections):
-        objVertexesArr = np.array(self.getObjectsVertexes(detections), dtype=np.int32)
+        return rect
+
+    def get_objects_vertexes(self, camera_detections):
+        objects_vertexes = []
+        for detection in camera_detections:
+            objects_vertexes.append(self.get_object_vertexes(detection))
+        return objects_vertexes
+
+    def get_object_fill(self, detection):
+        obj_vertexes_arr = np.array(self.get_object_vertexes(detection), dtype=np.int32)
         im = np.zeros([self.frameHeight, self.frameWidth], dtype=np.uint8)
-        cv2.fillPoly(im, objVertexesArr, 1)
-        objectsArea = cv2.countNonZero(im)
-        frameArea = self.frameHeight * self.frameWidth
-        objFillLvl = objectsArea / frameArea * 100
-        return objFillLvl
+        cv2.fillPoly(im, [obj_vertexes_arr], 1)
+        objects_area = cv2.countNonZero(im)
+        frame_area = self.frameHeight * self.frameWidth
+        obj_fill_lvl = objects_area / frame_area * 100
+        return obj_fill_lvl
 
-    def convertBack(self, x, y, w, h):
-        xmin = int(round(x - (w / 2)))
-        xmax = int(round(x + (w / 2)))
-        ymin = int(round(y - (h / 2)))
-        ymax = int(round(y + (h / 2)))
-        return xmin, ymin, xmax, ymax
+    def get_objects_fills(self, camera_detections):
+        obj_vertexes_arr = np.array(self.get_objects_vertexes(camera_detections), dtype=np.int32)
+        im = np.zeros([self.frameHeight, self.frameWidth], dtype=np.uint8)
+        cv2.fillPoly(im, [obj_vertexes_arr], 1)
+        objects_area = cv2.countNonZero(im)
+        frame_area = self.frameHeight * self.frameWidth
+        obj_fill_lvl = objects_area / frame_area * 100
+        return obj_fill_lvl
 
-    def cvDrawBoxes(self, detections, img):
-        xmin=0
-        ymin=0
-        xmax=0
-        ymax=0
-        for detection in detections:
-            x, y = self.getObjectCenter(detection)
-            w, h = self.getObjectDimensions(detection)
-            xmin, ymin, xmax, ymax = self.convertBack(
+    def convert_centered_to_topleft(self, x, y, w, h):
+        x_min = int(round(x - (w / 2)))
+        x_max = int(round(x + (w / 2)))
+        y_min = int(round(y - (h / 2)))
+        y_max = int(round(y + (h / 2)))
+        return x_min, y_min, x_max, y_max
+
+    def draw_boxes(self, camera_detections, img):
+        for detection in camera_detections:
+            x, y = self.get_object_center(detection)
+            w, h = self.get_object_size(detection)
+            x_min, y_min, x_max, y_max = self.convert_centered_to_topleft(
                 float(x), float(y), float(w), float(h))
-            tl = (xmin, ymin)
-            br = (xmax, ymax)
+            tl = (x_min, y_min)
+            br = (x_max, y_max)
             cv2.rectangle(img, tl, br, (0, 255, 0), 1)
             cv2.putText(img,
-                        str(detections.index(detection)) + ". "
+                        str(camera_detections.index(detection)) + ". "
                         " [" + str(round(detection[1] * 100, 2)) + "]",
                         (tl[0], tl[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                         [0, 255, 0], 2)
-        return img, xmin, ymin, xmax, ymax
+        return img
+
+    def get_objects_centers_offsets(self, detections):
+        xc, yc = self.get_frame_center()
+        offsets = []
+        for camera_detections in detections:
+            camera_offsets = []
+            for center in self.get_objects_centers(camera_detections):
+                dx = int(xc - center[0])
+                dy = int(yc - center[1])
+                camera_offsets.append([dx, dy])
+            offsets.append(camera_offsets)
+        return offsets
 
     def saveObjectsCenterDeltas(self):
-        xc, yc = self.getFrameCenter()
+        xc, yc = self.get_frame_center()
         self.objCenterDeltas.clear()
         for center in self.objCenters:
             xo = center[0]
@@ -252,9 +199,7 @@ class Camera:
             objCenterDelta = dx, dy
             self.objCenterDeltas.append(objCenterDelta)
 
-
-    def getPathAngle(self,frame):
-        
+    def get_path_angle(self, frame):
         grayImage = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         hsvImage = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         #dobrać HSV do koloru ścieżki
@@ -287,76 +232,44 @@ class Camera:
         cv2.imshow('',frame)
         return angle
 
-    def getMonoDistance(self,detections):
-        T = np.zeros((3, 1), dtype=np.float64)
-        R = np.eye(3, dtype=np.float64)
-        vectorInReal = 0
-        self.objDistances.clear()
-        for detection in detections:
-           x, y, w, h = detection[2][0],\
-            detection[2][1],\
-            detection[2][2],\
-            detection[2][3]
-           xmin, ymin, xmax, ymax = self.convertBack(float(x), float(y), float(w), float(h))
-           #rozpoznane granice ramki
-           vectorOnCap = np.array([[xmin,ymin],[xmax,ymin],[xmax,ymax],[xmin,ymax]],dtype=np.float32)
-           #wielkość r2d2 w rzeczywistosci
-           if(detections.index(detection) == "0"):
-              vectorInReal = np.array([[0,0,0],[ 1 * 50, 0, 0 ],[ 1 * 50, 1 * 75, 0 ],[ 0, 1 * 75, 0 ]],dtype=np.float32)
-           #macierz kamery P1
-           mtxCam = np.array([[907,0,645],[0,905,341.8],[0,0,1]])
-           #zniekształcenia radialne i tangencjalne
-           dist = np.array([[0.022,-0.1223,-0.002,0.003]])
-           #funkcja zwracająca macierz rotacji i translacji kamery wzgledem rozpoznanego obiektu
-           cv2.solvePnP(vectorInReal, vectorOnCap, mtxCam, dist, R, T)
-           self.objDistances.append(T[0][0])
-        
-    
-
-    #  def getDetectionObjectZones(self, detection):
-    #     detectionObjZones = []
-    #     x, y = self.getObjectCenter(detection)
-    #     w, h = self.getObjectDimensions(detection)
-    #     xmin, ymin, xmax, ymax = self.convertBack(float(x), float(y), float(w), float(h))
-    #     x_zonemin = int(xmin / (self.frameWidth / 3))
-    #     y_zonemin = int(ymin / (self.frameHeight / 3))
-    #     x_zonemax = int(xmax / (self.frameWidth / 3))
-    #     y_zonemax = int(ymax / (self.frameHeight / 3))
-    #     for i in range(x_zonemin, x_zonemax + 1):
-    #         for j in range(y_zonemin, y_zonemax + 1):
-    #             detectionObjZones.append(i + 3 * j + 1)
-    #     return detectionObjZones
-    # 
-    # def saveObjectsZones(self, detections):
-    #     objNum = self.getObjectsNum(detections)
+    # def get_mono_distance(self, detections):
+    #     T = np.zeros((3, 1), dtype=np.float64)
+    #     R = np.eye(3, dtype=np.float64)
+    #     vectorInReal = 0
+    #     self.objDistances.clear()
     #     for detection in detections:
-    #         if detections.index(detection) < len(self.objZones):
-    #             self.objZones[detections.index(detection)] = self.getDetectionObjectZones(detection)
-    #         else:
-    #             self.objZones.append(self.getDetectionObjectZones(detection))
-    #     # pop all surplus elements
-    #     for i in range(objNum, len(self.objZones)):
-    #         self.objZones.pop(objNum)
-    # 
-    # def getObjectsZones(self):
-    #     return self.objZones
+    #        x, y, w, h = detection[2][0],\
+    #         detection[2][1],\
+    #         detection[2][2],\
+    #         detection[2][3]
+    #        xmin, ymin, xmax, ymax = self.convert_centered_to_topleft(float(x), float(y), float(w), float(h))
+    #        #rozpoznane granice ramki
+    #        vectorOnCap = np.array([[xmin,ymin],[xmax,ymin],[xmax,ymax],[xmin,ymax]],dtype=np.float32)
+    #        #wielkość r2d2 w rzeczywistosci
+    #        if(detections.index(detection) == "0"):
+    #           vectorInReal = np.array([[0,0,0],[ 1 * 50, 0, 0 ],[ 1 * 50, 1 * 75, 0 ],[ 0, 1 * 75, 0 ]],dtype=np.float32)
+    #        #macierz kamery P1
+    #        mtxCam = np.array([[907,0,645],[0,905,341.8],[0,0,1]])
+    #        #zniekształcenia radialne i tangencjalne
+    #        dist = np.array([[0.022,-0.1223,-0.002,0.003]])
+    #        #funkcja zwracająca macierz rotacji i translacji kamery wzgledem rozpoznanego obiektu
+    #        cv2.solvePnP(vectorInReal, vectorOnCap, mtxCam, dist, R, T)
+    #        self.objDistances.append(T[0][0])
 
-    def getDetectImages(self):
+
+    def get_detections(self):
         return self.detections
 
-    def getObjectsFillLevels(self):
-        return self.objectsFillLevel
+    # def get_objects_fills_levels(self):
+    #     return self.objectsFillLevel
 
-    def getCameraFlag(self):
-        return self.cameraFlag
+    # def get_camera_flag(self):
+    #     return self.cameraFlag
 
-    def getObjDistances(self):
-        #return self.objDistances
+    def get_objects_distances(self, detection):
+        # return self.objDistances
         return [10]
 
     def getObjCenterDeltasXY(self):
         return self.objCenterDeltas
-
-    def getPathAngle(self):
-        return self.pathAngle
 
