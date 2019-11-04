@@ -1,8 +1,5 @@
-import os
 import cv2
 import numpy as np
-import time
-import darknet
 from Detector import Detector
 
 
@@ -41,12 +38,12 @@ class Camera:
         self.detector = Detector()
 
         # capture for both cameras
-        capture_front = cv2.VideoCapture(0)
+        capture_front = cv2.VideoCapture(1)
         capture_front.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         capture_front.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         capture_front.set(cv2.CAP_PROP_FPS, 30)
 
-        capture_down = cv2.VideoCapture(1)
+        capture_down = cv2.VideoCapture(2)
         capture_down.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         capture_down.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         capture_down.set(cv2.CAP_PROP_FPS, 30);
@@ -54,7 +51,7 @@ class Camera:
         self.captures = [capture_front, capture_down]
 
         # selection which camera view to process - [front, down]
-        self.view_selection = [True, False]
+        self.view_selection = [True, True]
 
     def __del__(self):
         for capture in self.captures:
@@ -65,7 +62,7 @@ class Camera:
         frames = [np.array([])] * 2
 
         # populate detections from both cameras
-        for i in range(1):
+        for i in range(2):
             if self.view_selection[i]:
                 ret, frame = self.captures[i].read()
                 if ret:
@@ -73,7 +70,6 @@ class Camera:
                     frame_resized = cv2.resize(frame_rgb, self.detector.get_network_size(),
                                                interpolation=cv2.INTER_LINEAR)
                     detections[i] = self.detector.detect(frame_resized)
-                    print(detections[i])
                     frames[i] = self.draw_boxes(detections[i], frame_resized)
                     frames[i] = cv2.cvtColor(frames[i], cv2.COLOR_BGR2RGB)
 
@@ -130,6 +126,7 @@ class Camera:
         br = [x_max, y_max]
         bl = [x_min, y_max]
         rect = [tl, tr, br, bl]
+
         return rect
 
     def get_objects_vertexes(self, camera_detections):
@@ -141,7 +138,7 @@ class Camera:
     def get_object_fill(self, detection):
         obj_vertexes_arr = np.array(self.get_object_vertexes(detection), dtype=np.int32)
         im = np.zeros([self.frameHeight, self.frameWidth], dtype=np.uint8)
-        cv2.fillPoly(im, obj_vertexes_arr, 1)
+        cv2.fillPoly(im, [obj_vertexes_arr], 1)
         objects_area = cv2.countNonZero(im)
         frame_area = self.frameHeight * self.frameWidth
         obj_fill_lvl = objects_area / frame_area * 100
@@ -150,7 +147,7 @@ class Camera:
     def get_objects_fills(self, camera_detections):
         obj_vertexes_arr = np.array(self.get_objects_vertexes(camera_detections), dtype=np.int32)
         im = np.zeros([self.frameHeight, self.frameWidth], dtype=np.uint8)
-        cv2.fillPoly(im, obj_vertexes_arr, 1)
+        cv2.fillPoly(im, [obj_vertexes_arr], 1)
         objects_area = cv2.countNonZero(im)
         frame_area = self.frameHeight * self.frameWidth
         obj_fill_lvl = objects_area / frame_area * 100

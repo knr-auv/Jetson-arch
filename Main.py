@@ -23,16 +23,18 @@ class CameraThread(threading.Thread):
         cv2.namedWindow('down_cam', cv2.WINDOW_AUTOSIZE)
 
     def run(self):
+        global detections
         while True:
             frames = self.cam.process()
             with detections_lock:
                 detections = self.cam.get_detections()
+                # print(detections)
 
             time.sleep(0.01)
 
             if frames[0].size != 0:
                 cv2.imshow('front_cam', frames[0])
-            if frames[1] != 0:
+            if frames[1].size != 0:
                 cv2.imshow('down_cam', frames[1])
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -43,48 +45,51 @@ class CameraThread(threading.Thread):
 
 
 class FrameMakerThread(threading.Thread):
-    singleDataFrame = []
-    multiDataFrame = []
+    single_data_frame = []
+    multi_data_frame = []
 
     def __init__(self, cam, connection):
         threading.Thread.__init__(self)
         self.cam = cam
         self.connection = connection
 
-        for item in range(0,6):
-            self.singleDataFrame.append(None)
+        for item in range(0, 6):
+            self.single_data_frame.append(None)
 
     def make_single_frame(self, detection):
-            try:
-                print('--------------')
-                self.singleDataFrame[0] = self.cam.get_objects_distances(detection)
-                print(self.cam.get_object_center(detection))
-                self.singleDataFrame[1] = self.cam.get_object_center(detection)[0]  # x
-                self.singleDataFrame[2] = self.cam.get_object_center(detection)[1]  # y
-                self.singleDataFrame[3] = self.cam.get_object_fill()
-                self.singleDataFrame[4] = detection
-                self.singleDataFrame[5] = False # flaga
-                print('--------------')
-                return self.singleDataFrame
-            except Exception:
-                return [[]]
+        single_data_frame = [[]] * 6
+        single_data_frame[0] = self.cam.get_objects_distances(detection)
+        single_data_frame[1] = self.cam.get_object_center(detection)[0]  # x
+        single_data_frame[2] = self.cam.get_object_center(detection)[1]  # y
+        single_data_frame[3] = self.cam.get_object_fill(detection)
+        single_data_frame[4] = detection
+        single_data_frame[5] = False
+
+        self.single_data_frame = single_data_frame
+
+        return single_data_frame
 
     def make_multi_frame(self, camera_detections):
-        self.multiDataFrame.clear()
+        multi_data_frame = []
         for detection in camera_detections:
-            self.multiDataFrame.append(self.make_single_frame(detection))
-        return self.multiDataFrame
+            single_frame = self.make_single_frame(detection)
+            multi_data_frame.append(single_frame)
+        return multi_data_frame
 
     def make_multi_camera_frame(self):
+        global detections
         multi_cam_frame = []
         for camera_detections in detections:
             multi_cam_frame.append(self.make_multi_frame(camera_detections))
+        return multi_cam_frame
 
     def run(self):
         while True:
             with detections_lock:
-                self.connection.setDataFrame(self.make_multi_camera_frame())
-            time.sleep(0.1)  # przykładowe opóźnienie
+                print("multi_camera:")
+                print(self.make_multi_camera_frame())
+                # self.connection.setDataFrame(self.make_multi_camera_frame())
+            time.sleep(0.25)  # przykładowe opóźnienie
            
 
 
@@ -98,6 +103,6 @@ while connFlag:
 cameraThread = CameraThread()
 cameraThread.start()
 
-frameMaker = FrameMakerThread(cameraThread.get_camera(), connThread)
+frameMaker = FrameMakerThread(cameraThread.get_camera(), 1)
 connThread.start() #rozpoczyna wysyłanie ramek danych do odroida przez ethernet
 frameMaker.start()
