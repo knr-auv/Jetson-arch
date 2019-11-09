@@ -6,8 +6,11 @@ import logging
 
 
 class StreamClient:
+    """ Klasa tworzy klienta socketa,
+    adress ip to adres serwera na komputerze"""
+
     def __init__(self, ip='10.42.0.74', port=8485):
-        """socket initialize"""
+        """Inicjalizacja socketa"""
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.ip = ip
         self.port = port
@@ -16,6 +19,7 @@ class StreamClient:
         self.encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
         self.img_counter = 0
 
+    """Metoda pobiera klatke i ja wysyła do serwera"""
     def send_frame(self, frame):
         result, data = cv2.imencode('.jpg', frame, self.encode_param)
         data = pickle.dumps(data, 0)
