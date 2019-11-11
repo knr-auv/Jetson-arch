@@ -176,6 +176,14 @@ class Camera:
                         [0, 255, 0], 2)
         return img
 
+    def get_object_center_offset(self, detection):
+        xc, yc = self.get_frame_center()
+        center = self.get_object_center(detection)
+        dx = int(xc - center[0])
+        dy = int(yc - center[1])
+        return [dx, dy]
+
+
     def get_objects_centers_offsets(self, detections):
         xc, yc = self.get_frame_center()
         offsets = []

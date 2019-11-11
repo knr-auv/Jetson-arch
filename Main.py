@@ -53,17 +53,16 @@ class FrameMakerThread(threading.Thread):
         self.cam = cam
         self.connection = connection
 
-        for item in range(0, 6):
+        for item in range(0, 5):
             self.single_data_frame.append(None)
 
     def make_single_frame(self, detection):
-        single_data_frame = [[]] * 6
+        single_data_frame = [[]] * 5
         single_data_frame[0] = self.cam.get_objects_distances(detection)
-        single_data_frame[1] = self.cam.get_object_center(detection)[0]  # x
-        single_data_frame[2] = self.cam.get_object_center(detection)[1]  # y
+        single_data_frame[1] = self.cam.get_object_center_offset(detection)[0]  # x
+        single_data_frame[2] = self.cam.get_object_center_offset(detection)[1]  # y
         single_data_frame[3] = self.cam.get_object_fill(detection)
         single_data_frame[4] = detection
-        single_data_frame[5] = False
 
         self.single_data_frame = single_data_frame
 
