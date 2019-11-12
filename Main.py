@@ -9,6 +9,11 @@ import subprocess
 
 from connectionJetson import Connection
 
+
+IP_ADDRESS_ODROID = '10.42.0.159'
+PORT_ODROID_1 = 8080  # port do wysyłania danych z kamer na odroida
+PORT_ODROID_2 = 8181 # port do wysyłania danych z pada na odro
+
 detections_lock = threading.Lock()
 lock2 = threading.Lock()
 
@@ -86,9 +91,11 @@ class FrameMakerThread(threading.Thread):
         while True:
             with detections_lock:
                 print("multi_camera:")
-                print(self.make_multi_camera_frame())
-                # self.connection.setDataFrame(self.make_multi_camera_frame())
-            time.sleep(0.25)  # przykładowe opóźnienie
+                # testing and validating results:
+                multi_data_frame_local = self.make_multi_camera_frame()
+                print(multi_data_frame_local)
+                self.connection.setDataFrame(multi_data_frame_local)
+            time.sleep(0.1)  # przykładowe opóźnienie
            
 
 
@@ -96,12 +103,12 @@ connFlag = True # flaga -> opuszczanie pętli od razu po połączeniu
 connThread = ''
 while connFlag:
     # Jetson próbuje połączyć się z odroidem przez ethernet od razu bo zbootowaniu się Jetsona
-    connThread = Connection('10.42.0.158')
+    connThread = Connection(IP_ADDRESS_ODROID, PORT_ODROID_1)
     connFlag = not connThread.flag
 
 cameraThread = CameraThread()
 cameraThread.start()
 
-frameMaker = FrameMakerThread(cameraThread.get_camera(), 1)
+frameMaker = FrameMakerThread(cameraThread.get_camera(), connThread)
 connThread.start() #rozpoczyna wysyłanie ramek danych do odroida przez ethernet
 frameMaker.start()
