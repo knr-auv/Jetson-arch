@@ -1,5 +1,12 @@
 # Jetson
 
+# 12.11.2019r.
+Aktualny schemat ramki ustalony na:
+```
+[ [[cam1_obj1_frame], [cam1_obj2_frame], ...], [[cam2_obj2_frame], [cam2_obj2_frame], ...]]
+```
+Gdzie cam*i*_obj*j*_frame = [distance *(<-prawdopodobnie do wywalenia)*, offset_x, offset_y, detection]
+
 # 9.11.2019r.
 Dodanie Klasy do stremingu obrazu StreamClient
 
