@@ -6,9 +6,9 @@ from time import sleep
 # ip = '192.168.137.147' #adres odroida
 
 class Connection(Thread):
-	def __init__(self, ip):
+	def __init__(self, ip, port):
 		Thread.__init__(self)
-		self.client = Client(ip) 
+		self.client = Client(ip, port)
 		self.flag = self.client.flag		 
 		self.dataFrame = []
 	def run(self):
