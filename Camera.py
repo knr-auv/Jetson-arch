@@ -208,36 +208,41 @@ class Camera:
             self.objCenterDeltas.append(objCenterDelta)
 
     def get_path_angle(self, frame):
-        grayImage = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        hsvImage = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        #dobrać HSV do koloru ścieżki
-        lowerColorPath = np.array([55, 0, 0])
-        upperColorPath = np.array([90, 255, 255])
-        maskPath = cv2.inRange(hsvImage, lowerColorPath, upperColorPath)
-        res = cv2.bitwise_and(frame, frame, mask=maskPath)
-        gaussBlur = cv2.medianBlur(res,15)
-        grayImage = cv2.cvtColor(gaussBlur, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(grayImage, 127, 255, 0)
-        kernel = np.ones((5,5), np.uint8)
+        '''
+        function return angle of found contour from vertical (0) to left ++ | right --
+        '''
+        hsv_img = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        #dobrać HSV do koloru ścieżki - aktualnie pomarancz
+        lower_color_thresh = np.array([0, 139, 78])
+        upper_color_thresh = np.array([23, 255, 255])
+        mask_img = cv2.inRange(hsv_img, lower_color_thresh, upper_color_thresh)
+        mask_img_blurred = cv2.medianBlur(mask_img,15)
 
-        imgErosion = cv2.erode(thresh, kernel, iterations=1)
-        imgDilation = cv2.dilate(imgErosion, kernel, iterations=5)
-        _, contours,_ = cv2.findContours(imgDilation, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-        for contour in contours:
-           rect = cv2.minAreaRect(contour)
-           angle = rect[2]
-           box = cv2.boxPoints(rect)
-           angle=int(rect[2])
-           if(rect[1][1]>rect[1][0]):
-              cv2.line(frame, (int(box[0][0]),int(box[0][1])), (int(box[1][0]),int(box[1][1])), (0,255,0), 2)
-              cv2.line(frame, (int(box[2][0]),int(box[2][1])), (int(box[3][0]),int(box[3][1])), (0,255,0), 2)
-              angle=90+abs(int(rect[2]))
-           if(rect[1][1]<rect[1][0]):   
-              cv2.line(frame, (int(box[0][0]),int(box[0][1])), (int(box[3][0]),int(box[3][1])), (0,255,0), 2)
-              cv2.line(frame, (int(box[1][0]),int(box[1][1])), (int(box[2][0]),int(box[2][1])), (0,255,0), 2)
-              angle=abs(int(rect[2]))
-        cv2.imshow('',frame)
+        contours,_ = cv2.findContours(mask_img_blurred, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        
+        angle = 0
+        if len(contours) > 0:
+            # find the biggest contour
+            areas = []
+            for c in contours:
+                areas.append(cv2.contourArea(c))
+            
+            max_id = areas.index(max(areas))
+            
+            contour_max = contours[max_id]
+            
+            rect = cv2.minAreaRect(contour_max)
+            angle = rect[2]
+            
+            if rect[1][1] > rect[1][0]:
+                cv2.line(frame, (int(box[0][0]),int(box[0][1])), (int(box[1][0]),int(box[1][1])), (0,255,0), 2)
+                cv2.line(frame, (int(box[2][0]),int(box[2][1])), (int(box[3][0]),int(box[3][1])), (0,255,0), 2)
+                angle=abs(int(rect[2]))
+            if rect[1][1] < rect[1][0] :   
+                cv2.line(frame, (int(box[0][0]),int(box[0][1])), (int(box[3][0]),int(box[3][1])), (0,255,0), 2)
+                cv2.line(frame, (int(box[1][0]),int(box[1][1])), (int(box[2][0]),int(box[2][1])), (0,255,0), 2)
+                angle=abs(int(rect[2])) - 90
         return angle
 
     # def get_mono_distance(self, detections):
