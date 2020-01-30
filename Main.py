@@ -2,6 +2,7 @@ from Camera import Camera
 import threading
 import time
 import cv2
+import argparse
 
 import subprocess
 
@@ -19,11 +20,15 @@ lock2 = threading.Lock()
 
 detections = []
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--config', required=True, type=str)
+args = parser.parse_args()
+
 
 class CameraThread(threading.Thread):
-    def __init__(self):
+    def __init__(self, config):
         threading.Thread.__init__(self)
-        self.cam = Camera()
+        self.cam = Camera(config)
         cv2.namedWindow('front_cam', cv2.WINDOW_AUTOSIZE)
         cv2.namedWindow('down_cam', cv2.WINDOW_AUTOSIZE)
 
@@ -106,7 +111,7 @@ while connFlag:
     connThread = Connection(IP_ADDRESS_ODROID, PORT_ODROID_1)
     connFlag = not connThread.flag
 
-cameraThread = CameraThread()
+cameraThread = CameraThread(args.config)
 cameraThread.start()
 
 frameMaker = FrameMakerThread(cameraThread.get_camera(), connThread)

@@ -11,9 +11,9 @@ class Detector:
         self.net_main = None
         self.alt_names = None
 
-        config_path = "cfg/yolov3-tiny-obj.cfg"
-        weight_path = "backup/yolov3-tiny-obj_2000.weights"
-        meta_path = "data/r2d2.data"
+        config_path = "cfg/yolov3-testowa2.cfg"
+        weight_path = "backup/yolov3-testowa2_6000.weights"
+        meta_path = "data/obj.data"
 
         if self.net_main is None:
             self.net_main = darknet.load_net_custom(config_path.encode("ascii"), weight_path.encode("ascii"), 0, 1)  # batch size = 1

@@ -1,4 +1,5 @@
 import cv2
+from StreamCapture import StreamCapture
 import numpy as np
 from Detector import Detector
 
@@ -34,21 +35,27 @@ class Camera:
 
     captures = []
 
-    def __init__(self):
+    def __init__(self, config):
         self.detector = Detector()
 
         # capture for both cameras
-        capture_front = cv2.VideoCapture(1)
-        capture_front.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        capture_front.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        capture_front.set(cv2.CAP_PROP_FPS, 30)
+        if config == "normal":
+            capture_front = cv2.VideoCapture(1)
+            capture_front.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            capture_front.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            capture_front.set(cv2.CAP_PROP_FPS, 30)
 
-        capture_down = cv2.VideoCapture(2)
-        capture_down.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        capture_down.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        capture_down.set(cv2.CAP_PROP_FPS, 30);
+            capture_down = cv2.VideoCapture(2)
+            capture_down.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            capture_down.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            capture_down.set(cv2.CAP_PROP_FPS, 30);
 
-        self.captures = [capture_front, capture_down]
+            self.captures = [capture_front, capture_down]
+            self.quantity = 2
+        else:
+            capture = StreamCapture(ip='10.42.0.2', port=44209)
+            self.captures = [capture]
+            self.quantity = 1
 
         # selection which camera view to process - [front, down]
         self.view_selection = [True, True]
@@ -62,7 +69,7 @@ class Camera:
         frames = [np.array([])] * 2
 
         # populate detections from both cameras
-        for i in range(2):
+        for i in range(self.quantity):
             if self.view_selection[i]:
                 ret, frame = self.captures[i].read()
                 if ret:
