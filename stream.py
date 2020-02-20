@@ -19,7 +19,7 @@ class StreamClient:
         self.encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
         self.img_counter = 0
 
-    """Metoda pobiera klatke i ja wysyła do serwera"""
+    """Metoda pobiera klatke i ja wysyla do serwera"""
     def send_frame(self, frame):
         result, data = cv2.imencode('.jpg', frame, self.encode_param)
         data = pickle.dumps(data, 0)

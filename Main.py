@@ -1,4 +1,5 @@
 from Camera import Camera
+from stream import StreamClient
 import threading
 import time
 import cv2
@@ -11,9 +12,11 @@ import subprocess
 from connectionJetson import Connection
 
 
-IP_ADDRESS_ODROID = '10.42.0.159'
-PORT_ODROID_1 = 8080  # port do wysyłania danych z kamer na odroida
-PORT_ODROID_2 = 8181 # port do wysyłania danych z pada na odro
+IP_ADDRESS_ODROID = '10.42.0.42'
+PORT_ODROID_1 = 8787  # port do wysylania danych z kamer na odroida
+PORT_ODROID_2 = 8181 # port do wysylania danych z pada na odro
+
+SEND_FLAG = True
 
 detections_lock = threading.Lock()
 lock2 = threading.Lock()
@@ -29,8 +32,10 @@ class CameraThread(threading.Thread):
     def __init__(self, config):
         threading.Thread.__init__(self)
         self.cam = Camera(config)
-        cv2.namedWindow('front_cam', cv2.WINDOW_AUTOSIZE)
-        cv2.namedWindow('down_cam', cv2.WINDOW_AUTOSIZE)
+        if SEND_FLAG:
+            self.stream = StreamClient(ip='10.42.0.42', port=5050)
+        # cv2.namedWindow('front_cam', cv2.WINDOW_AUTOSIZE)
+        # cv2.namedWindow('down_cam', cv2.WINDOW_AUTOSIZE)
 
     def run(self):
         global detections
@@ -42,10 +47,12 @@ class CameraThread(threading.Thread):
 
             time.sleep(0.01)
 
-            if frames[0].size != 0:
-                cv2.imshow('front_cam', frames[0])
-            if frames[1].size != 0:
-                cv2.imshow('down_cam', frames[1])
+            # if frames[0].size != 0:
+            #    cv2.imshow('front_cam', frames[0])
+            # if frames[1].size != 0:
+            #    cv2.imshow('down_cam', frames[1])
+            if frames[0].size != 0 and SEND_FLAG:
+                self.stream.send_frame(frames[0])
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -93,6 +100,7 @@ class FrameMakerThread(threading.Thread):
         return multi_cam_frame
 
     def run(self):
+        time.sleep(1)
         while True:
             with detections_lock:
                 print("multi_camera:")
@@ -100,14 +108,14 @@ class FrameMakerThread(threading.Thread):
                 multi_data_frame_local = self.make_multi_camera_frame()
                 print(multi_data_frame_local)
                 self.connection.setDataFrame(multi_data_frame_local)
-            time.sleep(0.1)  # przykładowe opóźnienie
+            time.sleep(0.1)  # przykladowe opoznienie
            
 
 
-connFlag = True # flaga -> opuszczanie pętli od razu po połączeniu
+connFlag = True # flaga -> opuszczanie petli od razu po polaczeniu
 connThread = ''
 while connFlag:
-    # Jetson próbuje połączyć się z odroidem przez ethernet od razu bo zbootowaniu się Jetsona
+    # Jetson probuje polaczyc sie z odroidem przez ethernet od razu bo zbootowaniu sie Jetsona
     connThread = Connection(IP_ADDRESS_ODROID, PORT_ODROID_1)
     connFlag = not connThread.flag
 
@@ -115,5 +123,5 @@ cameraThread = CameraThread(args.config)
 cameraThread.start()
 
 frameMaker = FrameMakerThread(cameraThread.get_camera(), connThread)
-connThread.start() #rozpoczyna wysyłanie ramek danych do odroida przez ethernet
+connThread.start() #rozpoczyna wysylanie ramek danych do odroida przez ethernet
 frameMaker.start()

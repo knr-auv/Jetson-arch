@@ -11,8 +11,8 @@ class Detector:
         self.net_main = None
         self.alt_names = None
 
-        config_path = "cfg/yolov3-testowa2.cfg"
-        weight_path = "backup/yolov3-testowa2_6000.weights"
+        config_path = "cfg/yolov3-okon1.cfg"
+        weight_path = "backup/yolov3-okon1_last.weights"
         meta_path = "data/obj.data"
 
         if self.net_main is None:
@@ -43,7 +43,7 @@ class Detector:
         self.darknet_image = darknet.make_image(darknet.network_width(self.net_main),
                                                 darknet.network_height(self.net_main), 3)
 
-        self.thresh = 0.25
+        self.thresh = 0.75
 
     def detect(self, image):
         darknet.copy_image_from_bytes(self.darknet_image, image.tobytes())
