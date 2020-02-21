@@ -11,9 +11,9 @@ class Detector:
         self.net_main = None
         self.alt_names = None
 
-        config_path = "cfg/yolov3-tiny-obj.cfg"
-        weight_path = "backup/yolov3-tiny-obj_2000.weights"
-        meta_path = "data/r2d2.data"
+        config_path = "cfg/yolov3-okon1.cfg"
+        weight_path = "backup/yolov3-okon1_last.weights"
+        meta_path = "data/obj.data"
 
         if self.net_main is None:
             self.net_main = darknet.load_net_custom(config_path.encode("ascii"), weight_path.encode("ascii"), 0, 1)  # batch size = 1
@@ -43,7 +43,7 @@ class Detector:
         self.darknet_image = darknet.make_image(darknet.network_width(self.net_main),
                                                 darknet.network_height(self.net_main), 3)
 
-        self.thresh = 0.25
+        self.thresh = 0.75
 
     def detect(self, image):
         darknet.copy_image_from_bytes(self.darknet_image, image.tobytes())

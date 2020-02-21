@@ -1,7 +1,9 @@
 import cv2
+from StreamCapture import StreamCapture
 import numpy as np
 from Detector import Detector
 
+IP_ADDRESS_SIM = '10.42.0.42'
 
 class Camera:
     # list of centers (x, y) of currently detected objects
@@ -29,26 +31,35 @@ class Camera:
     objectsFillLevel = 0
 
     # frame dimensions (firstly assumed but updated to real ones when capturing the frame)
-    frameHeight = 720
-    frameWidth = 1280
+    frameHeight = 416
+    frameWidth = 416
 
     captures = []
 
-    def __init__(self):
+    def __init__(self, config):
         self.detector = Detector()
 
+        self.frameHeight = self.detector.get_network_size()[0]
+        self.frameWidth = self.detector.get_network_size()[1]
+
         # capture for both cameras
-        capture_front = cv2.VideoCapture(1)
-        capture_front.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        capture_front.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        capture_front.set(cv2.CAP_PROP_FPS, 30)
+        if config == "normal":
+            capture_front = cv2.VideoCapture(1)
+            capture_front.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            capture_front.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            capture_front.set(cv2.CAP_PROP_FPS, 30)
 
-        capture_down = cv2.VideoCapture(2)
-        capture_down.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        capture_down.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        capture_down.set(cv2.CAP_PROP_FPS, 30);
+            capture_down = cv2.VideoCapture(2)
+            capture_down.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            capture_down.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            capture_down.set(cv2.CAP_PROP_FPS, 30);
 
-        self.captures = [capture_front, capture_down]
+            self.captures = [capture_front, capture_down]
+            self.quantity = 2
+        else:
+            capture = StreamCapture(ip=IP_ADDRESS_SIM, port=44209)
+            self.captures = [capture]
+            self.quantity = 1
 
         # selection which camera view to process - [front, down]
         self.view_selection = [True, True]
@@ -62,7 +73,7 @@ class Camera:
         frames = [np.array([])] * 2
 
         # populate detections from both cameras
-        for i in range(2):
+        for i in range(self.quantity):
             if self.view_selection[i]:
                 ret, frame = self.captures[i].read()
                 if ret:
@@ -210,7 +221,7 @@ class Camera:
     def get_path_angle(self, frame):
         grayImage = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         hsvImage = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        #dobrać HSV do koloru ścieżki
+        #dobrac HSV do koloru sciezki
         lowerColorPath = np.array([55, 0, 0])
         upperColorPath = np.array([90, 255, 255])
         maskPath = cv2.inRange(hsvImage, lowerColorPath, upperColorPath)
@@ -253,14 +264,14 @@ class Camera:
     #        xmin, ymin, xmax, ymax = self.convert_centered_to_topleft(float(x), float(y), float(w), float(h))
     #        #rozpoznane granice ramki
     #        vectorOnCap = np.array([[xmin,ymin],[xmax,ymin],[xmax,ymax],[xmin,ymax]],dtype=np.float32)
-    #        #wielkość r2d2 w rzeczywistosci
+    #        #wielkosc r2d2 w rzeczywistosci
     #        if(detections.index(detection) == "0"):
     #           vectorInReal = np.array([[0,0,0],[ 1 * 50, 0, 0 ],[ 1 * 50, 1 * 75, 0 ],[ 0, 1 * 75, 0 ]],dtype=np.float32)
     #        #macierz kamery P1
     #        mtxCam = np.array([[907,0,645],[0,905,341.8],[0,0,1]])
-    #        #zniekształcenia radialne i tangencjalne
+    #        #znieksztalcenia radialne i tangencjalne
     #        dist = np.array([[0.022,-0.1223,-0.002,0.003]])
-    #        #funkcja zwracająca macierz rotacji i translacji kamery wzgledem rozpoznanego obiektu
+    #        #funkcja zwracajaca macierz rotacji i translacji kamery wzgledem rozpoznanego obiektu
     #        cv2.solvePnP(vectorInReal, vectorOnCap, mtxCam, dist, R, T)
     #        self.objDistances.append(T[0][0])
 

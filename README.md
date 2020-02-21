@@ -1,5 +1,8 @@
 # Jetson
 
+# 30.01.2019r.
+Dodanie możliwośći używania obrazu z symulacji
+
 # 12.11.2019r.
 Aktualny schemat ramki ustalony na:
 ```
